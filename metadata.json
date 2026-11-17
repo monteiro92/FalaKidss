@@ -1,0 +1,6 @@
+{
+  "name": "Fala Melhor Infantil",
+  "description": "Plataforma infantil completa para estímulo da comunicação, desenvolvimento da linguagem e prática da pronúncia (2 a 12 anos). Cada palavra é uma conquista!",
+  "requestFramePermissions": ["microphone", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
