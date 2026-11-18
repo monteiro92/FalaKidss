@@ -4,22 +4,88 @@ export type AdminRoute = 'dashboard' | 'users' | 'asaas' | 'app-settings' | 'sec
 
 export type ManagedUserStatus = 'active' | 'blocked';
 
+export type AdminAccountType = 'responsavel' | 'educador' | 'clinica' | 'convidado';
+
+export type AdminPremiumDuration =
+  | '30_days'
+  | '90_days'
+  | '6_months'
+  | 'permanent'
+  | 'custom';
+
+export type UserAccessBadge =
+  | 'GRATUITO'
+  | 'PREMIUM PAGO'
+  | 'PREMIUM ADMINISTRATIVO'
+  | 'PREMIUM EXPIRADO'
+  | 'PREMIUM REVOGADO'
+  | 'BLOQUEADO';
+
+export interface AdminPremiumGrant {
+  active: boolean;
+  duration: AdminPremiumDuration;
+  durationLabel: string;
+  isPermanent: boolean;
+  startDate: string;
+  expiresAt: string | null;
+  reason: string;
+  grantedByEmail: string;
+  grantedByName?: string;
+  grantedAt: string;
+  revokedAt?: string | null;
+  revokedByEmail?: string | null;
+  revokeReason?: string | null;
+}
+
+export interface PaidSubscriptionSummary {
+  id: string;
+  status: 'PENDING' | 'ACTIVE' | 'OVERDUE' | 'CANCELED';
+  billingType: 'PIX' | 'CREDIT_CARD';
+  value: number;
+  nextDueDate: string | null;
+  startedAt: string;
+  activatedAt: string | null;
+  canceledAt: string | null;
+}
+
 export interface ManagedUserAccount {
   id: string;
   subscriberId?: string | null;
   childAccountId?: string | null;
   guardianName: string;
   email: string;
+  accountType: AdminAccountType;
   childName: string;
   childAge: number;
   status: ManagedUserStatus;
+  passwordSetupInvite?: boolean;
   starsCount: number;
   activitiesCount: number;
   createdAt: string;
   lastAccessAt: string;
   updatedAt?: string;
   notes?: string;
-  passwordHash?: string;
+  adminPremiumGrant?: AdminPremiumGrant | null;
+  paidSubscription?: PaidSubscriptionSummary | null;
+  // Computed server-authoritative fields
+  accessBadge: UserAccessBadge;
+  planLabel: 'FalaKids Gratuito' | 'FalaKids Premium';
+  accessType: string;
+  premiumValidityLabel: string;
+  hasEffectivePremium: boolean;
+}
+
+export interface AdminDashboardMetrics {
+  totalUsers: number;
+  freeUsers: number;
+  paidPremiumUsers: number;
+  adminPremiumUsers: number;
+  blockedUsers: number;
+  expiredSubscriptions: number;
+  revokedUsers: number;
+  receivedRevenueBRL: number;
+  commercialPlanPriceBRL: number;
+  activeUsers: number;
 }
 
 export interface AdminAppConfig {
@@ -37,7 +103,26 @@ export interface AdminAuditLog {
   action: string;
   detail: string;
   actorEmail: string;
+  actorName?: string;
+  targetUserId?: string | null;
+  targetUserEmail?: string | null;
   timestamp: string;
+}
+
+export interface AdminUserHistoryResponse {
+  user: ManagedUserAccount;
+  auditLogs: AdminAuditLog[];
+  payments: {
+    id: string;
+    asaasPaymentId: string;
+    value: number;
+    billingType: string;
+    status: string;
+    dueDate: string;
+    paidAt: string | null;
+    description?: string;
+    invoiceUrl?: string | null;
+  }[];
 }
 
 export interface AdminCredentialsRecord {
@@ -132,4 +217,3 @@ export interface VocalTractAccessResponse {
   message?: string;
   requiredPhraseTests?: RequiredPhraseTest[];
 }
-

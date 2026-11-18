@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { KeyRound, ShieldCheck, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { KeyRound, ShieldCheck, CheckCircle2, AlertCircle, Clock, Lock } from 'lucide-react';
 import { AdminAuditLog, AdminSession } from '../../types/admin';
 import { updateAdminCredentials } from '../../utils/adminStore';
 
@@ -52,11 +52,11 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900">
-          Segurança e Acesso Administrativo
+        <h1 className="text-2xl md:text-3xl font-display font-extrabold text-[#0F2942]">
+          Segurança, Permissões e Auditoria
         </h1>
         <p className="text-sm text-slate-600 mt-1">
-          Atualize seu e-mail e senha de administrador e acompanhe o histórico de acessos.
+          Acesso exclusivo para administradores autenticados no servidor, histórico completo de alterações e proteção de dados (LGPD).
         </p>
       </div>
 
@@ -64,18 +64,20 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
         {/* Credentials Form */}
         <form
           onSubmit={handleSubmit}
-          className="lg:col-span-6 rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-4"
+          className="lg:col-span-6 rounded-3xl border border-amber-200 bg-white p-5 sm:p-6 shadow-xs space-y-4"
         >
           <div className="flex items-center gap-2.5">
-            <KeyRound className="w-5 h-5 text-indigo-600" aria-hidden="true" />
-            <h2 className="text-base font-extrabold text-slate-900">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 text-orange-600 flex items-center justify-center">
+              <KeyRound className="w-5 h-5" aria-hidden="true" />
+            </div>
+            <h2 className="text-base font-extrabold text-[#0F2942]">
               Credenciais do Administrador
             </h2>
           </div>
 
           {status && (
             <div
-              className={`rounded-2xl border px-4 py-3 text-sm flex items-start gap-2 ${
+              className={`rounded-2xl border px-4 py-3 text-sm font-semibold flex items-start gap-2 ${
                 status.type === 'ok'
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
                   : 'border-rose-200 bg-rose-50 text-rose-800'
@@ -91,7 +93,7 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
           )}
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wide text-slate-600 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wide text-[#0F2942] mb-1">
               Nome do Administrador
             </label>
             <input
@@ -99,12 +101,12 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-3.5 py-2.5 text-sm"
+              className="w-full rounded-2xl border border-amber-200 bg-[#FFFDF7] px-3.5 py-2.5 text-sm text-[#0F2942] focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wide text-slate-600 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wide text-[#0F2942] mb-1">
               E-mail de Login
             </label>
             <input
@@ -112,12 +114,12 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-3.5 py-2.5 text-sm"
+              className="w-full rounded-2xl border border-amber-200 bg-[#FFFDF7] px-3.5 py-2.5 text-sm text-[#0F2942] focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wide text-slate-600 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wide text-[#0F2942] mb-1">
               Senha Atual (obrigatória para salvar)
             </label>
             <input
@@ -125,13 +127,13 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
               required
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-3.5 py-2.5 text-sm"
+              className="w-full rounded-2xl border border-amber-200 bg-[#FFFDF7] px-3.5 py-2.5 text-sm text-[#0F2942] focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-600 mb-1">
+              <label className="block text-xs font-bold uppercase tracking-wide text-[#0F2942] mb-1">
                 Nova Senha (opcional)
               </label>
               <input
@@ -139,25 +141,25 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
-                className="w-full rounded-2xl border border-slate-300 px-3.5 py-2.5 text-sm"
+                className="w-full rounded-2xl border border-amber-200 bg-[#FFFDF7] px-3.5 py-2.5 text-sm text-[#0F2942] focus:outline-none focus:ring-2 focus:ring-orange-400"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-600 mb-1">
+              <label className="block text-xs font-bold uppercase tracking-wide text-[#0F2942] mb-1">
                 Confirmar Nova Senha
               </label>
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 px-3.5 py-2.5 text-sm"
+                className="w-full rounded-2xl border border-amber-200 bg-[#FFFDF7] px-3.5 py-2.5 text-sm text-[#0F2942] focus:outline-none focus:ring-2 focus:ring-orange-400"
               />
             </div>
           </div>
 
           <button
             type="submit"
-            className="w-full rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-700 transition min-h-[46px]"
+            className="w-full rounded-2xl bg-orange-600 px-5 py-3 text-sm font-extrabold text-white hover:bg-orange-700 transition min-h-[46px] shadow-xs"
           >
             Atualizar credenciais
           </button>
@@ -165,18 +167,22 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
 
         {/* Active Session & Audit */}
         <div className="lg:col-span-6 space-y-4">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-3">
+          <div className="rounded-3xl border border-amber-200 bg-white p-5 sm:p-6 shadow-xs space-y-3">
             <div className="flex items-center gap-2.5">
-              <ShieldCheck className="w-5 h-5 text-emerald-600" aria-hidden="true" />
-              <h2 className="text-base font-extrabold text-slate-900">Sessão Protegida Ativa</h2>
+              <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <ShieldCheck className="w-5 h-5" aria-hidden="true" />
+              </div>
+              <h2 className="text-base font-extrabold text-[#0F2942]">Sessão Protegida Ativa</h2>
             </div>
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm space-y-1.5">
+            <div className="rounded-2xl border border-amber-200 bg-[#FFFDF7] p-4 text-sm space-y-2">
               <div>
-                <span className="text-slate-500">Autenticado como:</span>{' '}
-                <strong className="text-slate-900">{session.email}</strong>
+                <span className="text-slate-500">Administrador autenticado:</span>{' '}
+                <strong className="text-[#0F2942]">
+                  {session.name} ({session.email})
+                </strong>
               </div>
               <div className="text-xs text-slate-600 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" aria-hidden="true" />
+                <Clock className="w-3.5 h-3.5 text-orange-600" aria-hidden="true" />
                 <span>
                   Válida até{' '}
                   {new Date(session.expiresAt).toLocaleString('pt-BR', {
@@ -185,32 +191,42 @@ export const AdminSecurityView: React.FC<AdminSecurityViewProps> = ({
                   })}
                 </span>
               </div>
+              <div className="text-xs text-slate-600 flex items-start gap-1.5 pt-1 border-t border-amber-100">
+                <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
+                <span>
+                  Todas as rotas administrativas validam token assinado no servidor. Senhas nunca são expostas e operações seguem a LGPD.
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-3">
-            <h2 className="text-base font-extrabold text-slate-900">
-              Histórico de Auditoria ({logs.length})
+          <div className="rounded-3xl border border-amber-200 bg-white p-5 sm:p-6 shadow-xs space-y-3">
+            <h2 className="text-base font-extrabold text-[#0F2942]">
+              Histórico de Auditoria do Servidor ({logs.length})
             </h2>
-            <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
               {logs.length === 0 ? (
-                <p className="text-sm text-slate-500">Nenhum evento registrado.</p>
+                <p className="text-sm text-slate-500">Nenhum evento administrativo registrado.</p>
               ) : (
                 logs.map((log) => (
                   <div
                     key={log.id}
-                    className="rounded-2xl border border-slate-100 bg-slate-50 px-3.5 py-2.5 text-xs"
+                    className="rounded-2xl border border-amber-100 bg-[#FFFDF7] px-3.5 py-2.5 text-xs space-y-1"
                   >
-                    <div className="flex items-center justify-between gap-2 font-bold text-slate-900">
+                    <div className="flex items-center justify-between gap-2 font-bold text-[#0F2942]">
                       <span>{log.action}</span>
-                      <span className="text-slate-500 font-normal">
+                      <span className="text-slate-500 font-normal tabular-nums">
                         {new Date(log.timestamp).toLocaleString('pt-BR', {
                           dateStyle: 'short',
                           timeStyle: 'short',
                         })}
                       </span>
                     </div>
-                    <div className="text-slate-600 mt-0.5">{log.detail}</div>
+                    <div className="text-slate-700">{log.detail}</div>
+                    <div className="text-[11px] text-amber-800 font-semibold">
+                      Responsável: {log.actorName ? `${log.actorName} · ` : ''}
+                      {log.actorEmail}
+                    </div>
                   </div>
                 ))
               )}

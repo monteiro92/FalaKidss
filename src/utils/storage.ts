@@ -73,6 +73,7 @@ export function createDefaultState(): AppPersistedState {
       practicedPhraseIds: [],
       favoritePhraseIds: [],
       exploredPhraseCategories: [],
+      gamesProgress: {},
       history: [],
     },
   };
@@ -104,6 +105,12 @@ export function loadPersistedState(): AppPersistedState {
       exploredPhraseCategories: Array.isArray(parsed.progress?.exploredPhraseCategories)
         ? parsed.progress.exploredPhraseCategories
         : [],
+      gamesProgress:
+        parsed.progress?.gamesProgress &&
+        typeof parsed.progress.gamesProgress === 'object' &&
+        !Array.isArray(parsed.progress.gamesProgress)
+          ? parsed.progress.gamesProgress
+          : {},
     };
 
     if (progress.lastActiveDate !== today) {

@@ -34,7 +34,7 @@ const CAMERA_PRESETS: Record<
 const _emissiveHighlight = new THREE.Color('#38BDF8');
 const _emissiveZero = new THREE.Color('#000000');
 
-export const Mouth3DCanvas: React.FC<Mouth3DCanvasProps> = ({
+export const Mouth3DCanvas: React.FC<Mouth3DCanvasProps> = React.memo(({
   activePhraseText,
   isPlaying,
   playbackSpeed,
@@ -528,6 +528,7 @@ export const Mouth3DCanvas: React.FC<Mouth3DCanvasProps> = ({
 
     let frameId = 0;
     let lastPartsKey = '';
+    let lastPhaseText = '';
     const clock = new THREE.Clock();
     const _targetCamPos = new THREE.Vector3();
     const _targetControlsTarget = new THREE.Vector3();
@@ -619,8 +620,11 @@ export const Mouth3DCanvas: React.FC<Mouth3DCanvasProps> = ({
         onActivePartsRef.current?.(activeParts);
       }
 
-      if (playingRef.current) {
+      if (playingRef.current && phaseText !== lastPhaseText) {
+        lastPhaseText = phaseText;
         onPhasePulseRef.current?.(phaseText);
+      } else if (!playingRef.current && lastPhaseText !== '') {
+        lastPhaseText = '';
       }
 
       const dampSpeed = 11;
@@ -770,4 +774,5 @@ export const Mouth3DCanvas: React.FC<Mouth3DCanvasProps> = ({
       </div>
     </div>
   );
-};
+});
+

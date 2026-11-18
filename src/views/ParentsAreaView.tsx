@@ -6,19 +6,27 @@ import {
   Clock,
   Trash2,
   CheckCircle2,
-  Bell,
   Camera,
   UserCheck,
   AlertTriangle,
 } from 'lucide-react';
 import { MEDALS, getAgeRecommendations } from '../data/curriculum';
-import { AppPersistedState } from '../types/app';
+import { AppPersistedState, AppSection } from '../types/app';
+import { CatalogItemDTO, ContentCatalogResponse, PremiumStatusResponse } from '../types/premium';
 import { ageToGroup } from '../utils/storage';
-import { AudioControlsBar } from '../components/AudioControlsBar';
 import { ThemePicker } from '../components/ThemePicker';
+import { PremiumSection } from '../components/PremiumSection';
+import { ContentTierBadge } from '../components/ContentTierBadge';
 
 interface ParentsAreaViewProps {
   state: AppPersistedState;
+  premiumStatus: PremiumStatusResponse | null;
+  loadingPremium: boolean;
+  catalogItems?: CatalogItemDTO[];
+  catalogCounts?: ContentCatalogResponse['counts'];
+  onRefreshPremium: (sync?: boolean) => Promise<void>;
+  onPremiumStatusChange: (nextStatus: PremiumStatusResponse) => void;
+  onNavigate?: (section: AppSection) => void;
   onUpdateState: (updater: (prev: AppPersistedState) => AppPersistedState) => void;
   onDeleteAllData: () => Promise<void>;
 }
@@ -36,6 +44,13 @@ const SELECTABLE_MODULES = [
 
 export const ParentsAreaView: React.FC<ParentsAreaViewProps> = ({
   state,
+  premiumStatus,
+  loadingPremium,
+  catalogItems,
+  catalogCounts,
+  onRefreshPremium,
+  onPremiumStatusChange,
+  onNavigate,
   onUpdateState,
   onDeleteAllData,
 }) => {
@@ -179,6 +194,18 @@ export const ParentsAreaView: React.FC<ParentsAreaViewProps> = ({
           <strong>Acompanhamento positivo e sem diagnósticos:</strong> o FalaKids celebra a participação da criança. Nossas métricas nunca classificam crianças como atrasadas nem substituem avaliação de um fonoaudiólogo.
         </p>
       </div>
+
+      {/* FalaKids Premium — Assinatura e Gerenciamento */}
+      <PremiumSection
+        profile={state.profile}
+        progress={state.progress}
+        premiumStatus={premiumStatus}
+        loadingPremium={loadingPremium}
+        catalogCounts={catalogCounts}
+        onRefreshPremium={onRefreshPremium}
+        onStatusUpdated={onPremiumStatusChange}
+        onNavigate={onNavigate}
+      />
 
       {/* LGPD Verifiable Parental Consent */}
       <section className="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
@@ -340,20 +367,44 @@ export const ParentsAreaView: React.FC<ParentsAreaViewProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {SELECTABLE_MODULES.map((mod) => {
               const checked = state.profile.selectedModules.includes(mod.id);
+              const catalogMod = catalogItems?.find(
+                (entry) => entry.category === 'module' && entry.id === mod.id
+              );
+              const hubSummary =
+                mod.id === 'games'
+                  ? `${catalogCounts?.byCategory.game.free ?? 10} gratuitos · ${
+                      catalogCounts?.byCategory.game.premium ?? 2
+                    } Premium`
+                  : mod.id === 'stories'
+                  ? `${catalogCounts?.byCategory.story.free ?? 3} gratuitas · ${
+                      catalogCounts?.byCategory.story.premium ?? 2
+                    } Premium`
+                  : null;
               return (
                 <button
                   key={mod.id}
                   type="button"
                   onClick={() => toggleModule(mod.id)}
-                  className={`rounded-2xl border px-3.5 py-3 text-left text-sm font-semibold flex items-center justify-between transition min-h-[44px] ${
+                  className={`rounded-2xl border px-3.5 py-3 text-left text-sm font-semibold flex items-center justify-between gap-2 transition min-h-[48px] ${
                     checked
                       ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                       : 'bg-slate-50 border-slate-200 text-slate-500'
                   }`}
                 >
-                  <span>{mod.label}</span>
+                  <div className="min-w-0 space-y-1">
+                    <div className="truncate">{mod.label}</div>
+                    {catalogMod ? (
+                      <ContentTierBadge
+                        tier={catalogMod.tier}
+                        unlocked={catalogMod.unlocked}
+                        compact
+                      />
+                    ) : hubSummary ? (
+                      <div className="text-[11px] font-bold text-slate-500">{hubSummary}</div>
+                    ) : null}
+                  </div>
                   <CheckCircle2
-                    className={`w-4 h-4 ${checked ? 'text-emerald-600' : 'text-slate-300'}`}
+                    className={`w-4 h-4 shrink-0 ${checked ? 'text-emerald-600' : 'text-slate-300'}`}
                     aria-hidden="true"
                   />
                 </button>
@@ -467,45 +518,6 @@ export const ParentsAreaView: React.FC<ParentsAreaViewProps> = ({
           onUpdateState((prev) => ({ ...prev, themeId: nextTheme }))
         }
       />
-
-      {/* Audio & Notifications */}
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
-        <h2 className="text-xl font-bold text-slate-900">Configurações de Áudio e Notificações</h2>
-        <AudioControlsBar
-          settings={state.audio}
-          onChange={(nextAudio) =>
-            onUpdateState((prev) => ({ ...prev, audio: nextAudio }))
-          }
-        />
-
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <div className="flex items-center gap-3">
-            <Bell className="w-5 h-5 text-sky-600" aria-hidden="true" />
-            <div>
-              <div className="text-sm font-bold text-slate-900">Lembretes diários gentis</div>
-              <div className="text-xs text-slate-600">
-                Receber aviso opcional no dispositivo para brincar alguns minutos por dia.
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() =>
-              onUpdateState((prev) => ({
-                ...prev,
-                profile: { ...prev.profile, notificationsEnabled: !prev.profile.notificationsEnabled },
-              }))
-            }
-            className={`rounded-2xl px-4 py-2 text-sm font-bold min-h-[44px] ${
-              state.profile.notificationsEnabled
-                ? 'bg-sky-600 text-white'
-                : 'bg-white border border-slate-300 text-slate-700'
-            }`}
-          >
-            {state.profile.notificationsEnabled ? 'Ativados' : 'Desativados'}
-          </button>
-        </div>
-      </section>
 
       {/* Complete Data Deletion (LGPD) */}
       <section className="rounded-3xl border border-rose-200 bg-rose-50/40 p-6 space-y-4">

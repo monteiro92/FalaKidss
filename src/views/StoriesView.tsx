@@ -1,18 +1,52 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Volume2, RotateCcw, CheckCircle2, Sparkles, BookOpen } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Volume2, RotateCcw, CheckCircle2, Sparkles, BookOpen, Star, Lock } from 'lucide-react';
 import { STORIES, StoryItem } from '../data/curriculum';
 import { AudioSettings } from '../types/app';
+import { CatalogItemDTO, ContentTier, PremiumStoryPayload } from '../types/premium';
+import { ContentTierBadge } from '../components/ContentTierBadge';
 import { playFeedbackTone, speakPtBr, stopSpeaking } from '../utils/speech';
+import oceanoCover from '../assets/images/story_premium_oceano_1795006076054.jpg';
+import nuvemCover from '../assets/images/story_premium_nuvem_1795006076383.jpg';
+
+const PREMIUM_COVER_MAP: Record<string, string> = {
+  'prem-oceano-coral': oceanoCover,
+  'prem-nuvem-arcoiris': nuvemCover,
+};
+
+const PREMIUM_STORY_PREVIEWS = [
+  {
+    id: 'prem-oceano-coral',
+    title: 'O Oceano Encantado de Coral',
+    ageHint: '3 a 10 anos',
+    coverImage: oceanoCover,
+  },
+  {
+    id: 'prem-nuvem-arcoiris',
+    title: 'A Nuvem Viajante e o Arco-Íris',
+    ageHint: '4 a 12 anos',
+    coverImage: nuvemCover,
+  },
+];
 
 interface StoriesViewProps {
   audioSettings: AudioSettings;
   storiesRead: string[];
+  hasPremiumAccess?: boolean;
+  loadingCatalog?: boolean;
+  catalogItems?: CatalogItemDTO[];
+  exclusiveStories?: PremiumStoryPayload[];
+  onGoToPremium?: () => void;
   onFinishStory: (storyId: string, storyTitle: string) => void;
 }
 
 export const StoriesView: React.FC<StoriesViewProps> = ({
   audioSettings,
   storiesRead,
+  hasPremiumAccess = false,
+  loadingCatalog = false,
+  catalogItems = [],
+  exclusiveStories = [],
+  onGoToPremium,
   onFinishStory,
 }) => {
   const [activeStory, setActiveStory] = useState<StoryItem | null>(null);
@@ -22,6 +56,29 @@ export const StoriesView: React.FC<StoriesViewProps> = ({
   const [matchDone, setMatchDone] = useState(false);
   const [comprehensionMsg, setComprehensionMsg] = useState<string | null>(null);
   const narratingCancelRef = useRef(false);
+
+  const catalogById = useMemo(() => {
+    const map = new Map<string, CatalogItemDTO>();
+    for (const item of catalogItems) {
+      map.set(item.id, item);
+    }
+    return map;
+  }, [catalogItems]);
+
+  const exclusiveStoryById = useMemo(() => {
+    const map = new Map<string, PremiumStoryPayload>();
+    for (const s of exclusiveStories) {
+      map.set(s.id, s);
+    }
+    return map;
+  }, [exclusiveStories]);
+
+  const getStoryAccess = (storyId: string, defaultTier: ContentTier) => {
+    const entry = catalogById.get(storyId);
+    const tier: ContentTier = entry?.tier || defaultTier;
+    const unlocked = entry ? entry.unlocked : tier === 'GRATUITO' || hasPremiumAccess;
+    return { tier, unlocked };
+  };
 
   useEffect(() => {
     return () => {
@@ -60,7 +117,12 @@ export const StoriesView: React.FC<StoriesViewProps> = ({
     setCurrentLine(-1);
   };
 
-  const openStory = (story: StoryItem) => {
+  const openStory = (story: StoryItem, defaultTier: ContentTier) => {
+    const { unlocked } = getStoryAccess(story.id, defaultTier);
+    if (!unlocked) {
+      onGoToPremium?.();
+      return;
+    }
     stopNarration();
     setActiveStory(story);
     setAnswers({});
@@ -111,10 +173,14 @@ export const StoriesView: React.FC<StoriesViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {STORIES.map((story) => {
             const alreadyRead = storiesRead.includes(story.id);
+            const { tier, unlocked } = getStoryAccess(story.id, 'GRATUITO');
+
             return (
               <div
                 key={story.id}
-                className="rounded-3xl border border-slate-200 bg-white overflow-hidden flex flex-col justify-between shadow-sm"
+                className={`rounded-3xl border bg-white overflow-hidden flex flex-col justify-between shadow-sm ${
+                  unlocked ? 'border-slate-200' : 'border-amber-300'
+                }`}
               >
                 <div>
                   <div className="relative aspect-video bg-slate-100 overflow-hidden">
@@ -122,35 +188,173 @@ export const StoriesView: React.FC<StoriesViewProps> = ({
                       src={story.coverImage}
                       alt={story.title}
                       referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
+                      className={`w-full h-full object-cover ${unlocked ? '' : 'opacity-85'}`}
                     />
+                    <div className="absolute top-3 left-3">
+                      <ContentTierBadge tier={tier} unlocked={unlocked} overlay />
+                    </div>
                     {alreadyRead && (
                       <div className="absolute top-3 right-3 rounded-xl bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white inline-flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
                         Lida
                       </div>
                     )}
+                    {!unlocked && (
+                      <div className="absolute inset-0 bg-slate-900/20 flex items-center justify-center">
+                        <span className="inline-flex items-center gap-1.5 rounded-2xl bg-white/95 border border-amber-300 px-3 py-1.5 text-xs font-extrabold text-[#0F2942] shadow-sm">
+                          <Lock className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
+                          <span>Disponível no FalaKids Premium</span>
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="p-5">
-                    <p className="text-xs font-semibold text-slate-500">Faixa sugerida · {story.ageHint}</p>
-                    <h2 className="text-xl font-extrabold text-slate-900 mt-1">{story.title}</h2>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-slate-500">
+                        Faixa sugerida · {story.ageHint}
+                      </p>
+                      <ContentTierBadge tier={tier} unlocked={unlocked} compact />
+                    </div>
+                    <h2 className="text-xl font-extrabold text-slate-900 mt-1.5">{story.title}</h2>
                   </div>
                 </div>
 
                 <div className="px-5 pb-5">
-                  <button
-                    type="button"
-                    onClick={() => openStory(story)}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 py-3 text-sm font-bold text-white hover:bg-violet-700 transition min-h-[46px]"
-                  >
-                    <BookOpen className="w-4 h-4" aria-hidden="true" />
-                    <span>Ler e Ouvir História</span>
-                  </button>
+                  {unlocked ? (
+                    <button
+                      type="button"
+                      onClick={() => openStory(story, 'GRATUITO')}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 py-3 text-sm font-bold text-white hover:bg-violet-700 transition min-h-[46px]"
+                    >
+                      <BookOpen className="w-4 h-4" aria-hidden="true" />
+                      <span>Ler e Ouvir História</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onGoToPremium?.()}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 hover:bg-amber-100 py-3 text-sm font-bold text-amber-950 transition min-h-[46px]"
+                    >
+                      <Lock className="w-4 h-4 text-amber-700" aria-hidden="true" />
+                      <span>Desbloquear na Área dos Pais</span>
+                    </button>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
+
+        {/* Histórias Exclusivas · FalaKids Premium */}
+        <section className="rounded-3xl border-2 border-amber-300 bg-gradient-to-br from-[#FFFDF7] via-[#FEF6E4] to-[#FFF4E0] p-6 space-y-5 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-amber-900">
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-600" aria-hidden="true" />
+                <span>Histórias Exclusivas · FalaKids Premium</span>
+              </div>
+              <h2 className="text-xl font-extrabold text-[#0F2942]">
+                Contos Especiais para Assinantes
+              </h2>
+            </div>
+
+            {!hasPremiumAccess && onGoToPremium && (
+              <button
+                type="button"
+                onClick={onGoToPremium}
+                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-500 px-4 py-2.5 text-sm font-extrabold text-white hover:from-orange-700 hover:to-amber-600 transition min-h-[44px] self-start"
+              >
+                <Star className="w-4 h-4 fill-white" aria-hidden="true" />
+                <span>Assinar FalaKids Premium</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {PREMIUM_STORY_PREVIEWS.map((preview) => {
+              const alreadyRead = storiesRead.includes(preview.id);
+              const { tier, unlocked } = getStoryAccess(preview.id, 'PREMIUM');
+              const payload = exclusiveStoryById.get(preview.id);
+              const resolvedCover = PREMIUM_COVER_MAP[preview.id] || preview.coverImage;
+              const isReady = unlocked && Boolean(payload);
+              const isLoading = unlocked && !payload && loadingCatalog;
+
+              return (
+                <div
+                  key={preview.id}
+                  className="rounded-3xl border border-amber-300 bg-white overflow-hidden flex flex-col justify-between shadow-sm"
+                >
+                  <div>
+                    <div className="relative aspect-video bg-amber-50 overflow-hidden">
+                      <img
+                        src={resolvedCover}
+                        alt={preview.title}
+                        referrerPolicy="no-referrer"
+                        className={`w-full h-full object-cover ${isReady ? '' : 'opacity-85'}`}
+                      />
+                      <div className="absolute top-3 left-3">
+                        <ContentTierBadge tier={tier} unlocked={unlocked} overlay />
+                      </div>
+                      {alreadyRead && (
+                        <div className="absolute top-3 right-3 rounded-xl bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white inline-flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+                          <span>Lida</span>
+                        </div>
+                      )}
+                      {!unlocked && (
+                        <div className="absolute inset-0 bg-slate-900/20 flex items-center justify-center">
+                          <span className="inline-flex items-center gap-1.5 rounded-2xl bg-white/95 border border-amber-300 px-3.5 py-2 text-xs font-extrabold text-[#0F2942] shadow-sm">
+                            <Lock className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
+                            <span>Disponível no FalaKids Premium</span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-5">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-amber-800">
+                          Faixa sugerida · {preview.ageHint}
+                        </p>
+                        <ContentTierBadge tier={tier} unlocked={unlocked} compact />
+                      </div>
+                      <h3 className="text-xl font-extrabold text-[#0F2942] mt-1.5">
+                        {preview.title}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="px-5 pb-5">
+                    {isReady && payload ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openStory({ ...payload, coverImage: resolvedCover }, 'PREMIUM')
+                        }
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-700 hover:to-amber-600 py-3 text-sm font-bold text-white transition min-h-[46px]"
+                      >
+                        <BookOpen className="w-4 h-4" aria-hidden="true" />
+                        <span>Ler e Ouvir História Exclusiva</span>
+                      </button>
+                    ) : isLoading ? (
+                      <div className="w-full inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 py-3 text-sm font-bold text-amber-900 min-h-[46px]">
+                        Carregando história...
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onGoToPremium?.()}
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 hover:bg-amber-100 py-3 text-sm font-bold text-amber-950 transition min-h-[46px]"
+                      >
+                        <Lock className="w-4 h-4 text-amber-700" aria-hidden="true" />
+                        <span>Desbloquear na Área dos Pais</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       </div>
     );
   }

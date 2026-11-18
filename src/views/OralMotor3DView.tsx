@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   RotateCcw,
   Volume2,
@@ -38,6 +38,23 @@ interface SavedPhraseItem {
 const STORAGE_SAVED_KEY = 'fala_melhor_vocal_saved_phrases_v1';
 
 const SPEED_OPTIONS = [0.5, 0.75, 1.0, 1.25] as const;
+
+function parseBatchLines(text: string): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .forEach((line) => {
+      const key = line.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(line);
+      }
+    });
+  return result;
+}
 
 function loadSavedPhrases(): SavedPhraseItem[] {
   try {
@@ -136,22 +153,34 @@ export const OralMotor3DView: React.FC<OralMotor3DViewProps> = ({
     };
   }, []);
 
-  const batchLines = useMemo(() => {
-    const seen = new Set<string>();
-    const result: string[] = [];
-    batchText
-      .split(/\n+/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .forEach((line) => {
-        const key = line.toLowerCase();
-        if (!seen.has(key)) {
-          seen.add(key);
-          result.push(line);
-        }
-      });
-    return result;
-  }, [batchText]);
+  const deferredBatchText = useDeferredValue(batchText);
+
+  const batchLines = useMemo(() => parseBatchLines(deferredBatchText), [deferredBatchText]);
+
+  const handleSelectPart = useCallback(
+    (part: AnatomyPartId) => {
+      playFeedbackTone('click', audioSettings.volume);
+      setSelectedPart(part);
+    },
+    [audioSettings.volume]
+  );
+
+  const handlePhasePulse = useCallback((label: string) => {
+    setPhaseLabel(label);
+  }, []);
+
+  const handlePhraseChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const novoTexto = e.target.value;
+    setPhraseInput(novoTexto); // Atualiza imediatamente o estado local do campo
+    startTransition(() => {
+      setActivePhrase(novoTexto.trim() ? novoTexto : '');
+    });
+  };
+
+  const handleBatchTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const novoTexto = e.target.value;
+    setBatchText(novoTexto);
+  };
 
   const isActivePhraseFavorite = useMemo(() => {
     const norm = activePhrase.trim().toLowerCase();
@@ -217,14 +246,15 @@ export const OralMotor3DView: React.FC<OralMotor3DViewProps> = ({
   };
 
   const handleAddBatchToList = () => {
-    if (batchLines.length === 0) {
+    const currentLines = parseBatchLines(batchText);
+    if (currentLines.length === 0) {
       showBatchNotice('Digite ou carregue pelo menos uma frase no campo acima.');
       return;
     }
 
     const existing = new Set(savedPhrases.map((s) => s.text.trim().toLowerCase()));
     const toAdd: SavedPhraseItem[] = [];
-    batchLines.forEach((line, index) => {
+    currentLines.forEach((line, index) => {
       const norm = line.toLowerCase();
       if (!existing.has(norm)) {
         existing.add(norm);
@@ -255,7 +285,8 @@ export const OralMotor3DView: React.FC<OralMotor3DViewProps> = ({
       return;
     }
 
-    if (batchLines.length === 0) {
+    const currentLines = parseBatchLines(batchText);
+    if (currentLines.length === 0) {
       showBatchNotice('Digite ou carregue pelo menos uma frase para praticar em lote.');
       return;
     }
@@ -267,7 +298,7 @@ export const OralMotor3DView: React.FC<OralMotor3DViewProps> = ({
 
     const speakStep = (index: number) => {
       if (batchRunIdRef.current !== runId) return;
-      if (index >= batchLines.length) {
+      if (index >= currentLines.length) {
         setIsBatchPlaying(false);
         setBatchActiveIndex(null);
         setIsPlaying(false);
@@ -276,7 +307,7 @@ export const OralMotor3DView: React.FC<OralMotor3DViewProps> = ({
         return;
       }
 
-      const phrase = batchLines[index];
+      const phrase = currentLines[index];
       setBatchActiveIndex(index);
       setActivePhrase(phrase);
       setPhraseInput(phrase);
@@ -387,12 +418,9 @@ export const OralMotor3DView: React.FC<OralMotor3DViewProps> = ({
             playbackSpeed={playbackSpeed}
             selectedPart={selectedPart}
             cameraPreset={cameraPreset}
-            onSelectPart={(part) => {
-              playFeedbackTone('click', audioSettings.volume);
-              setSelectedPart(part);
-            }}
+            onSelectPart={handleSelectPart}
             onSelectCameraPreset={setCameraPreset}
-            onPhasePulse={(label) => setPhaseLabel(label)}
+            onPhasePulse={handlePhasePulse}
             onActivePartsChange={setActiveParts}
           />
         </div>
@@ -466,12 +494,7 @@ export const OralMotor3DView: React.FC<OralMotor3DViewProps> = ({
                 id="vocal-phrase-input"
                 type="text"
                 value={phraseInput}
-                onChange={(e) => {
-                  setPhraseInput(e.target.value);
-                  if (e.target.value.trim()) {
-                    setActivePhrase(e.target.value);
-                  }
-                }}
+                onChange={handlePhraseChange}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     handleHearActivePhrase();
@@ -666,9 +689,9 @@ export const OralMotor3DView: React.FC<OralMotor3DViewProps> = ({
             id="vocal-batch-input"
             rows={4}
             value={batchText}
-            onChange={(e) => setBatchText(e.target.value)}
+            onChange={handleBatchTextChange}
             placeholder={'Ex.:\nBom dia, mamãe!\nQuero beber um copo de água.\nVamos brincar de bola.'}
-            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
           />
         </div>
 

@@ -57,7 +57,7 @@ export const AdminAsaasView: React.FC = () => {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [webhookTokenInput, setWebhookTokenInput] = useState('');
   const [pixEnabled, setPixEnabled] = useState(true);
-  const [defaultPlanValue, setDefaultPlanValue] = useState('29.90');
+  const [defaultPlanValue, setDefaultPlanValue] = useState('29.99');
   const [defaultPlanDescription, setDefaultPlanDescription] = useState(
     'Cobrança PIX - FalaKids'
   );
@@ -72,7 +72,7 @@ export const AdminAsaasView: React.FC = () => {
   const [customerName, setCustomerName] = useState('');
   const [customerCpfCnpj, setCustomerCpfCnpj] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
-  const [pixValue, setPixValue] = useState('29.90');
+  const [pixValue, setPixValue] = useState('29.99');
   const [pixDescription, setPixDescription] = useState('Cobrança PIX - FalaKids');
   const [pixRef, setPixRef] = useState('');
   const [generatingPix, setGeneratingPix] = useState(false);
@@ -277,12 +277,12 @@ export const AdminAsaasView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 text-emerald-900 px-3 py-1 text-xs font-extrabold mb-2">
-            <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-900 px-3 py-1 text-xs font-extrabold mb-2">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" />
             <span>Ambiente de PRODUÇÃO · https://api.asaas.com/v3</span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900">
-            Integração Asaas (PIX Produção)
+          <h1 className="text-2xl md:text-3xl font-display font-extrabold text-[#0F2942]">
+            Integração Asaas (Pagamentos e Assinaturas)
           </h1>
           <p className="text-sm text-slate-600 mt-1">
             Configure a chave API protegida no servidor, gere cobranças PIX com QR Code e acompanhe confirmações automáticas por Webhook.
@@ -293,10 +293,10 @@ export const AdminAsaasView: React.FC = () => {
           type="button"
           onClick={() => loadPayments()}
           disabled={loadingPayments}
-          className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 hover:bg-slate-50 transition min-h-[44px] self-start sm:self-auto"
+          className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-white px-4 py-2.5 text-sm font-bold text-[#0F2942] hover:bg-amber-50 transition min-h-[44px] self-start sm:self-auto"
         >
           <RefreshCw
-            className={`w-4 h-4 ${loadingPayments ? 'animate-spin' : ''}`}
+            className={`w-4 h-4 text-orange-600 ${loadingPayments ? 'animate-spin' : ''}`}
             aria-hidden="true"
           />
           <span>Atualizar consultas</span>
@@ -326,12 +326,14 @@ export const AdminAsaasView: React.FC = () => {
         {/* Left: Server-Protected API Key & Webhook Config */}
         <form
           onSubmit={handleSaveConfig}
-          className="xl:col-span-6 rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-4"
+          className="xl:col-span-6 rounded-3xl border border-amber-200 bg-white p-5 sm:p-6 shadow-xs space-y-4"
         >
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
-              <KeyRound className="w-5 h-5 text-indigo-600" aria-hidden="true" />
-              <h2 className="text-base font-extrabold text-slate-900">
+              <div className="w-9 h-9 rounded-xl bg-amber-100 text-orange-600 flex items-center justify-center">
+                <KeyRound className="w-5 h-5" aria-hidden="true" />
+              </div>
+              <h2 className="text-base font-extrabold text-[#0F2942]">
                 Configuração do Gateway (Servidor)
               </h2>
             </div>
@@ -351,7 +353,7 @@ export const AdminAsaasView: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wide text-slate-600 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wide text-[#0F2942] mb-1">
               API Key de Produção Asaas
             </label>
             <input
@@ -364,7 +366,7 @@ export const AdminAsaasView: React.FC = () => {
                   ? 'Chave salva no servidor (preencha apenas para substituir)'
                   : '$aact_prod_...'
               }
-              className="w-full rounded-2xl border border-slate-300 px-3.5 py-2.5 text-sm"
+              className="w-full rounded-2xl border border-amber-200 bg-[#FFFDF7] px-3.5 py-2.5 text-sm text-[#0F2942] focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
             <p className="text-[11px] text-slate-500 mt-1">
               Armazenada exclusivamente no servidor. Nunca é enviada ou exposta ao navegador.
@@ -373,7 +375,7 @@ export const AdminAsaasView: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-600 mb-1">
+              <label className="block text-xs font-bold uppercase tracking-wide text-[#0F2942] mb-1">
                 Valor Padrão da Cobrança (R$)
               </label>
               <input
@@ -382,37 +384,37 @@ export const AdminAsaasView: React.FC = () => {
                 min="5"
                 value={defaultPlanValue}
                 onChange={(e) => setDefaultPlanValue(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 px-3.5 py-2.5 text-sm"
+                className="w-full rounded-2xl border border-amber-200 bg-[#FFFDF7] px-3.5 py-2.5 text-sm text-[#0F2942] focus:outline-none focus:ring-2 focus:ring-orange-400"
               />
             </div>
 
-            <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 cursor-pointer self-end min-h-[42px]">
-              <span className="text-sm font-bold text-slate-900">PIX Ativado</span>
+            <label className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-[#FFFDF7] px-3.5 py-2.5 cursor-pointer self-end min-h-[42px]">
+              <span className="text-sm font-bold text-[#0F2942]">PIX Ativado</span>
               <input
                 type="checkbox"
                 checked={pixEnabled}
                 onChange={(e) => setPixEnabled(e.target.checked)}
-                className="w-4 h-4 accent-indigo-600"
+                className="w-4 h-4 accent-orange-600"
               />
             </label>
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wide text-slate-600 mb-1">
+            <label className="block text-xs font-bold uppercase tracking-wide text-[#0F2942] mb-1">
               Descrição Padrão das Cobranças
             </label>
             <input
               type="text"
               value={defaultPlanDescription}
               onChange={(e) => setDefaultPlanDescription(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-3.5 py-2.5 text-sm"
+              className="w-full rounded-2xl border border-amber-200 bg-[#FFFDF7] px-3.5 py-2.5 text-sm text-[#0F2942] focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
 
           {/* Webhook Section */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wide text-slate-700">
-              <Webhook className="w-4 h-4 text-indigo-600" aria-hidden="true" />
+          <div className="rounded-2xl border border-amber-200 bg-[#FFFBEB]/70 p-4 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wide text-[#0F2942]">
+              <Webhook className="w-4 h-4 text-orange-600" aria-hidden="true" />
               <span>Webhook Automático Asaas</span>
             </div>
 
@@ -421,14 +423,14 @@ export const AdminAsaasView: React.FC = () => {
                 type="text"
                 readOnly
                 value={config?.webhookUrlHint || '/api/webhooks/asaas'}
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 font-mono"
+                className="flex-1 rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-slate-700 font-mono"
               />
               <button
                 type="button"
                 onClick={() => copyText(config?.webhookUrlHint || '', 'webhook')}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 inline-flex items-center gap-1 shrink-0"
+                className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs font-bold text-[#0F2942] hover:bg-amber-50 inline-flex items-center gap-1 shrink-0"
               >
-                <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+                <Copy className="w-3.5 h-3.5 text-orange-600" aria-hidden="true" />
                 <span>{copiedWebhookUrl ? 'Copiado' : 'Copiar'}</span>
               </button>
             </div>
@@ -443,7 +445,7 @@ export const AdminAsaasView: React.FC = () => {
                 value={webhookTokenInput}
                 onChange={(e) => setWebhookTokenInput(e.target.value)}
                 placeholder="Preencha apenas para alterar o token (asaas-access-token)"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-[#0F2942]"
               />
             </div>
 
@@ -451,7 +453,7 @@ export const AdminAsaasView: React.FC = () => {
               type="button"
               onClick={handleRegisterWebhook}
               disabled={registeringWebhook || !config?.configured}
-              className="w-full rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-bold text-indigo-900 hover:bg-indigo-100 disabled:opacity-50 transition"
+              className="w-full rounded-xl border border-amber-300 bg-amber-100/80 px-3.5 py-2 text-xs font-bold text-[#0F2942] hover:bg-amber-200/70 disabled:opacity-50 transition"
             >
               {registeringWebhook
                 ? 'Registrando webhook no Asaas...'
@@ -463,7 +465,7 @@ export const AdminAsaasView: React.FC = () => {
             <button
               type="submit"
               disabled={savingConfig}
-              className="flex-1 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60 min-h-[46px]"
+              className="flex-1 rounded-2xl bg-orange-600 px-4 py-3 text-sm font-extrabold text-white hover:bg-orange-700 disabled:opacity-60 min-h-[46px]"
             >
               {savingConfig ? 'Salvando...' : 'Salvar configurações'}
             </button>
@@ -471,7 +473,7 @@ export const AdminAsaasView: React.FC = () => {
               type="button"
               onClick={handleTestConnection}
               disabled={testingConn || !config?.configured}
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 hover:bg-slate-100 disabled:opacity-50 min-h-[46px]"
+              className="rounded-2xl border border-amber-200 bg-[#FFFDF7] px-4 py-3 text-sm font-bold text-[#0F2942] hover:bg-amber-50 disabled:opacity-50 min-h-[46px]"
             >
               {testingConn ? 'Testando...' : 'Testar Conexão'}
             </button>
@@ -482,11 +484,13 @@ export const AdminAsaasView: React.FC = () => {
         <div className="xl:col-span-6 space-y-4">
           <form
             onSubmit={handleGeneratePix}
-            className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-4"
+            className="rounded-3xl border border-amber-200 bg-white p-5 sm:p-6 shadow-xs space-y-4"
           >
             <div className="flex items-center gap-2.5">
-              <QrCode className="w-5 h-5 text-emerald-600" aria-hidden="true" />
-              <h2 className="text-base font-extrabold text-slate-900">
+              <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <QrCode className="w-5 h-5" aria-hidden="true" />
+              </div>
+              <h2 className="text-base font-extrabold text-[#0F2942]">
                 Gerar Cobrança PIX (Produção)
               </h2>
             </div>
@@ -679,7 +683,7 @@ export const AdminAsaasView: React.FC = () => {
       </div>
 
       {/* Queries, Orders, Live Asaas Payments & Transactions History */}
-      <section className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-5">
+      <section className="rounded-3xl border border-amber-200 bg-white p-5 sm:p-6 shadow-xs space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex flex-wrap gap-2">
             {(
@@ -695,8 +699,8 @@ export const AdminAsaasView: React.FC = () => {
                 onClick={() => setActiveTab(tab.id)}
                 className={`rounded-2xl px-4 py-2 text-xs sm:text-sm font-bold border transition min-h-[40px] ${
                   activeTab === tab.id
-                    ? 'bg-indigo-600 border-indigo-600 text-white'
-                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    ? 'bg-orange-600 border-orange-600 text-white shadow-xs'
+                    : 'bg-[#FFFDF7] border-amber-200 text-[#0F2942] hover:bg-amber-50'
                 }`}
               >
                 {tab.label}

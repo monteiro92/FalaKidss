@@ -44,6 +44,16 @@ export interface ActivityHistoryItem {
   starsEarned: number;
 }
 
+export type GameDifficulty = 'facil' | 'medio' | 'dificil';
+
+export interface GameProgressEntry {
+  hits: number;
+  attempts: number;
+  stars: number;
+  lastIndex: number;
+  difficulty: GameDifficulty;
+}
+
 export interface ProgressState {
   starsTotal: number;
   todayStars: number;
@@ -61,6 +71,7 @@ export interface ProgressState {
   practicedPhraseIds: string[];
   favoritePhraseIds: string[];
   exploredPhraseCategories: string[];
+  gamesProgress: Record<string, GameProgressEntry>;
   history: ActivityHistoryItem[];
 }
 

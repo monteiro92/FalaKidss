@@ -8,30 +8,43 @@ import {
   ArrowLeft,
   Menu,
   X,
-  ShieldCheck,
   QrCode,
 } from 'lucide-react';
+import tucaAppIcon from '../../assets/images/tuca_app_icon.png';
 import {
+  AdminAccountType,
   AdminAppConfig,
   AdminAuditLog,
+  AdminDashboardMetrics,
+  AdminPremiumDuration,
   AdminRoute,
   AdminSession,
   ManagedUserAccount,
+  ManagedUserStatus,
 } from '../../types/admin';
+import { ContentTier } from '../../types/premium';
 import {
+  AdminContentCatalogResponse,
   adminRouteToPath,
   appendAdminAuditLog,
+  blockAdminUser,
   createAdminUser,
   deleteAdminUser,
+  fetchAdminContentCatalog,
+  fetchAdminUserHistory,
   fetchAdminUsers,
   getActiveAdminSession,
+  grantAdminUserPremium,
   loadAdminAppConfig,
   loadAdminAuditLogs,
   loadManagedUsers,
   logoutAdminSession,
   parseAdminRouteFromPathname,
+  revokeAdminUserPremium,
   saveAdminAppConfig,
   saveManagedUsers,
+  unblockAdminUser,
+  updateAdminContentTier,
   updateAdminUser,
 } from '../../utils/adminStore';
 import { AdminLoginView } from './AdminLoginView';
@@ -50,8 +63,8 @@ interface AdminPortalProps {
 
 const ADMIN_NAV: { id: AdminRoute; label: string; Icon: React.FC<{ className?: string }> }[] = [
   { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
-  { id: 'users', label: 'Usuários', Icon: Users },
-  { id: 'asaas', label: 'Asaas (PIX)', Icon: QrCode },
+  { id: 'users', label: 'Usuários & Premium', Icon: Users },
+  { id: 'asaas', label: 'Asaas (Pagamentos)', Icon: QrCode },
   { id: 'app-settings', label: 'Aplicativo', Icon: Settings },
   { id: 'security', label: 'Segurança', Icon: Shield },
 ];
@@ -69,28 +82,57 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [users, setUsers] = useState<ManagedUserAccount[]>(() => loadManagedUsers());
+  const [metrics, setMetrics] = useState<AdminDashboardMetrics | null>(null);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [usersNotice, setUsersNotice] = useState<string | null>(null);
   const [usersError, setUsersError] = useState<string | null>(null);
   const [appConfig, setAppConfig] = useState<AdminAppConfig>(() => loadAdminAppConfig());
   const [logs, setLogs] = useState<AdminAuditLog[]>(() => loadAdminAuditLogs());
+  const [contentCatalog, setContentCatalog] = useState<AdminContentCatalogResponse | null>(null);
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [savingCatalogId, setSavingCatalogId] = useState<string | null>(null);
+  const [catalogNotice, setCatalogNotice] = useState<string | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   useEffect(() => {
     setRoute(parseAdminRouteFromPathname(currentPathname));
   }, [currentPathname]);
+
+  const loadCatalogFromServer = useCallback(async () => {
+    if (!getActiveAdminSession()) return;
+    setLoadingCatalog(true);
+    setCatalogError(null);
+    try {
+      const payload = await fetchAdminContentCatalog();
+      setContentCatalog(payload);
+      if (Array.isArray(payload.auditLogs) && payload.auditLogs.length > 0) {
+        setLogs(payload.auditLogs);
+      }
+    } catch (err) {
+      setCatalogError(
+        err instanceof Error ? err.message : 'Erro ao carregar classificação dos conteúdos.'
+      );
+    } finally {
+      setLoadingCatalog(false);
+    }
+  }, []);
 
   const loadUsersFromServer = useCallback(async () => {
     if (!getActiveAdminSession()) return;
     setLoadingUsers(true);
     setUsersError(null);
     try {
-      const serverUsers = await fetchAdminUsers();
-      setUsers(serverUsers);
-      saveManagedUsers(serverUsers);
+      const payload = await fetchAdminUsers();
+      setUsers(payload.users);
+      setMetrics(payload.metrics);
+      if (payload.auditLogs.length > 0) {
+        setLogs(payload.auditLogs);
+      }
+      saveManagedUsers(payload.users);
     } catch (err) {
       setUsersError(
-        err instanceof Error ? err.message : 'Erro ao carregar lista de usuários do servidor.'
+        err instanceof Error ? err.message : 'Erro ao carregar dados administrativos do servidor.'
       );
     } finally {
       setLoadingUsers(false);
@@ -100,8 +142,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   useEffect(() => {
     if (session) {
       loadUsersFromServer();
+      loadCatalogFromServer();
     }
-  }, [session, route, loadUsersFromServer]);
+  }, [session, route, loadUsersFromServer, loadCatalogFromServer]);
 
   // Verify session validity periodically
   useEffect(() => {
@@ -116,7 +159,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   }, [session]);
 
   const navigateAdmin = (nextRoute: AdminRoute) => {
-    // Route protection: reject route switches if unauthenticated
     const active = getActiveAdminSession();
     if (!active) {
       setSession(null);
@@ -131,7 +173,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const handleLogout = () => {
     logoutAdminSession();
     setSession(null);
-    setLogs(loadAdminAuditLogs());
     onSyncPathname('/admin');
   };
 
@@ -142,53 +183,68 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         onSuccess={(newSession) => {
           setSession(newSession);
           setAppConfig(loadAdminAppConfig());
-          setLogs(loadAdminAuditLogs());
         }}
         onExitToApp={onExitToApp}
       />
     );
   }
 
-  const recordLog = (action: string, detail: string) => {
-    const nextLogs = appendAdminAuditLog(action, detail, session.email);
-    setLogs(nextLogs);
-  };
-
   const showAutoSavedNotice = (msg: string) => {
     setUsersNotice(msg);
     window.setTimeout(() => {
       setUsersNotice((curr) => (curr === msg ? null : curr));
-    }, 4000);
+    }, 4500);
+  };
+
+  const applyMutationState = (
+    nextUsers: ManagedUserAccount[],
+    nextMetrics: AdminDashboardMetrics,
+    nextLogs: AdminAuditLog[]
+  ) => {
+    setUsers(nextUsers);
+    saveManagedUsers(nextUsers);
+    setMetrics(nextMetrics);
+    if (Array.isArray(nextLogs)) {
+      setLogs(nextLogs);
+    }
   };
 
   const handleCreateUser = async (payload: {
     guardianName: string;
     email: string;
+    accountType: AdminAccountType;
     childName: string;
     childAge: number;
-    status: ManagedUserAccount['status'];
+    status: ManagedUserStatus;
+    plan: 'free' | 'premium';
+    passwordMode: 'provisional' | 'invite';
     password?: string;
     notes?: string;
+    premiumGrant?: {
+      duration: AdminPremiumDuration;
+      startDate?: string;
+      expiresAt?: string | null;
+      reason?: string;
+    };
   }) => {
     setUsersError(null);
-    const created = await createAdminUser(payload);
-    setUsers((prev) => {
-      const next = [created, ...prev];
-      saveManagedUsers(next);
-      return next;
-    });
-    recordLog('Conta cadastrada', `${created.guardianName} (${created.email})`);
-    showAutoSavedNotice(`Usuário ${created.guardianName} cadastrado e salvo automaticamente.`);
+    const res = await createAdminUser(payload);
+    const nextUsers = [res.user, ...users];
+    applyMutationState(nextUsers, res.metrics, res.auditLogs);
+    showAutoSavedNotice(`Usuário ${res.user.guardianName} adicionado e salvo no servidor.`);
   };
 
   const handleUpdateUser = async (
     id: string,
     payload: {
-      guardianName: string;
-      email: string;
-      childName: string;
-      childAge: number;
-      status: ManagedUserAccount['status'];
+      guardianName?: string;
+      email?: string;
+      accountType?: AdminAccountType;
+      childName?: string;
+      childAge?: number;
+      status?: ManagedUserStatus;
+      plan?: 'free' | 'premium';
+      passwordMode?: 'keep' | 'provisional' | 'invite';
       password?: string;
       notes?: string;
     }
@@ -196,41 +252,80 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setUsersError(null);
     setSavingUserId(id);
     try {
-      const updated = await updateAdminUser(id, payload);
-      setUsers((prev) => {
-        const next = prev.map((u) => (u.id === updated.id ? updated : u));
-        saveManagedUsers(next);
-        return next;
-      });
-      recordLog('Conta editada', `${updated.guardianName} (${updated.email})`);
-      showAutoSavedNotice(`Alterações de ${updated.guardianName} salvas automaticamente.`);
+      const res = await updateAdminUser(id, payload);
+      const nextUsers = users.map((u) => (u.id === res.user.id ? res.user : u));
+      applyMutationState(nextUsers, res.metrics, res.auditLogs);
+      showAutoSavedNotice(`Cadastro de ${res.user.guardianName} atualizado com sucesso.`);
     } finally {
       setSavingUserId(null);
     }
   };
 
-  const handleToggleBlockUser = async (target: ManagedUserAccount) => {
-    const nextStatus = (target.status === 'active' ? 'blocked' : 'active') as ManagedUserAccount['status'];
+  const handleGrantPremium = async (
+    id: string,
+    payload: {
+      duration: AdminPremiumDuration;
+      startDate?: string;
+      expiresAt?: string | null;
+      reason?: string;
+    }
+  ) => {
+    setUsersError(null);
+    setSavingUserId(id);
+    try {
+      const res = await grantAdminUserPremium(id, payload);
+      const nextUsers = users.map((u) => (u.id === res.user.id ? res.user : u));
+      applyMutationState(nextUsers, res.metrics, res.auditLogs);
+      showAutoSavedNotice(
+        `FalaKids Premium liberado administrativamente para ${res.user.guardianName}.`
+      );
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
+  const handleRevokePremium = async (id: string, reason?: string) => {
+    setUsersError(null);
+    setSavingUserId(id);
+    try {
+      const res = await revokeAdminUserPremium(id, reason);
+      const nextUsers = users.map((u) => (u.id === res.user.id ? res.user : u));
+      applyMutationState(nextUsers, res.metrics, res.auditLogs);
+      showAutoSavedNotice(
+        `Acesso Premium administrativo revogado para ${res.user.guardianName}.`
+      );
+    } catch (err) {
+      setUsersError(err instanceof Error ? err.message : 'Erro ao revogar Premium.');
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
+  const handleBlockUser = async (target: ManagedUserAccount) => {
     setUsersError(null);
     setSavingUserId(target.id);
     try {
-      const updated = await updateAdminUser(target.id, { status: nextStatus });
-      setUsers((prev) => {
-        const next = prev.map((u) => (u.id === updated.id ? updated : u));
-        saveManagedUsers(next);
-        return next;
-      });
-      recordLog(
-        nextStatus === 'blocked' ? 'Conta bloqueada' : 'Conta desbloqueada',
-        `${updated.guardianName} (${updated.email})`
-      );
-      showAutoSavedNotice(
-        nextStatus === 'blocked'
-          ? `Usuário ${updated.guardianName} bloqueado e salvo automaticamente.`
-          : `Usuário ${updated.guardianName} desbloqueado e salvo automaticamente.`
-      );
+      const res = await blockAdminUser(target.id);
+      const nextUsers = users.map((u) => (u.id === res.user.id ? res.user : u));
+      applyMutationState(nextUsers, res.metrics, res.auditLogs);
+      showAutoSavedNotice(`Usuário ${res.user.guardianName} bloqueado no servidor.`);
     } catch (err) {
-      setUsersError(err instanceof Error ? err.message : 'Erro ao alterar status do usuário.');
+      setUsersError(err instanceof Error ? err.message : 'Erro ao bloquear usuário.');
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
+  const handleUnblockUser = async (target: ManagedUserAccount) => {
+    setUsersError(null);
+    setSavingUserId(target.id);
+    try {
+      const res = await unblockAdminUser(target.id);
+      const nextUsers = users.map((u) => (u.id === res.user.id ? res.user : u));
+      applyMutationState(nextUsers, res.metrics, res.auditLogs);
+      showAutoSavedNotice(`Usuário ${res.user.guardianName} desbloqueado com sucesso.`);
+    } catch (err) {
+      setUsersError(err instanceof Error ? err.message : 'Erro ao desbloquear usuário.');
     } finally {
       setSavingUserId(null);
     }
@@ -240,14 +335,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setUsersError(null);
     setSavingUserId(target.id);
     try {
-      await deleteAdminUser(target.id);
-      setUsers((prev) => {
-        const next = prev.filter((u) => u.id !== target.id);
-        saveManagedUsers(next);
-        return next;
-      });
-      recordLog('Conta excluída', `${target.guardianName} (${target.email})`);
-      showAutoSavedNotice(`Usuário ${target.guardianName} removido e salvo automaticamente.`);
+      const res = await deleteAdminUser(target.id);
+      const nextUsers = users.filter((u) => u.id !== target.id);
+      applyMutationState(nextUsers, res.metrics, res.auditLogs);
+      showAutoSavedNotice(`Usuário ${target.guardianName} excluído permanentemente.`);
     } catch (err) {
       setUsersError(err instanceof Error ? err.message : 'Erro ao excluir usuário.');
     } finally {
@@ -259,7 +350,36 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setAppConfig(nextConfig);
     saveAdminAppConfig(nextConfig);
     onConfigUpdated(nextConfig);
-    recordLog('Configurações atualizadas', 'Parâmetros globais do aplicativo salvos');
+    appendAdminAuditLog(
+      'Configurações do aplicativo atualizadas',
+      'Parâmetros globais salvos',
+      session.email
+    );
+  };
+
+  const handleToggleContentTier = async (id: string, nextTier: ContentTier) => {
+    setCatalogError(null);
+    setCatalogNotice(null);
+    setSavingCatalogId(id);
+    try {
+      const updated = await updateAdminContentTier(id, nextTier);
+      setContentCatalog(updated);
+      if (Array.isArray(updated.auditLogs) && updated.auditLogs.length > 0) {
+        setLogs(updated.auditLogs);
+      }
+      const changedItem = updated.items.find((it) => it.id === id);
+      const msg = `"${changedItem?.title || id}" classificado como ${nextTier} no servidor.`;
+      setCatalogNotice(msg);
+      window.setTimeout(() => {
+        setCatalogNotice((curr) => (curr === msg ? null : curr));
+      }, 4000);
+    } catch (err) {
+      setCatalogError(
+        err instanceof Error ? err.message : 'Não foi possível alterar a classificação do conteúdo.'
+      );
+    } finally {
+      setSavingCatalogId(null);
+    }
   };
 
   const renderMenuButtons = () => (
@@ -275,8 +395,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             aria-current={active ? 'page' : undefined}
             className={`w-full flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm font-bold transition min-h-[44px] ${
               active
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                ? 'bg-gradient-to-r from-orange-600 to-amber-500 text-white shadow-sm'
+                : 'text-[#0F2942] hover:bg-amber-100/80'
             }`}
           >
             <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -288,42 +408,48 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col lg:flex-row">
-      {/* Desktop Dedicated Admin Sidebar */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-72 bg-slate-950 text-slate-100 p-5 justify-between shrink-0 border-r border-slate-800">
+    <div className="min-h-screen bg-[#FFFDF5] text-[#0F2942] flex flex-col lg:flex-row">
+      {/* Desktop Dedicated FalaKids Admin Sidebar */}
+      <aside className="hidden lg:flex lg:flex-col lg:w-72 bg-[#FFFBEB] text-[#0F2942] p-5 justify-between shrink-0 border-r border-amber-200">
         <div className="space-y-6">
           <div className="flex items-center gap-3 px-1">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-5 h-5" aria-hidden="true" />
-            </div>
+            <img
+              src={tucaAppIcon}
+              alt="FalaKids"
+              className="w-11 h-11 rounded-2xl object-cover shadow-xs border border-amber-200 shrink-0"
+            />
             <div className="min-w-0">
-              <div className="text-sm font-extrabold text-white truncate">Administração</div>
-              <div className="text-[11px] text-slate-400 truncate">FalaKids</div>
+              <div className="text-base font-display font-extrabold text-[#0F2942] truncate">
+                FalaKids Admin
+              </div>
+              <div className="text-[11px] font-bold text-orange-700 truncate">
+                Gestão Administrativa
+              </div>
             </div>
           </div>
 
           {renderMenuButtons()}
         </div>
 
-        <div className="space-y-2 pt-4 border-t border-slate-800">
-          <div className="px-2 pb-2">
-            <div className="text-xs font-bold text-white truncate">{session.name}</div>
-            <div className="text-[11px] text-slate-400 truncate">{session.email}</div>
+        <div className="space-y-2.5 pt-4 border-t border-amber-200">
+          <div className="rounded-2xl border border-amber-200 bg-white/80 px-3 py-2.5">
+            <div className="text-xs font-extrabold text-[#0F2942] truncate">{session.name}</div>
+            <div className="text-[11px] text-slate-600 truncate">{session.email}</div>
           </div>
 
           <button
             type="button"
             onClick={onExitToApp}
-            className="w-full flex items-center gap-2.5 rounded-2xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-xs font-bold text-slate-200 hover:bg-slate-800 transition min-h-[42px]"
+            className="w-full flex items-center gap-2.5 rounded-2xl border border-amber-200 bg-white px-3.5 py-2.5 text-xs font-bold text-[#0F2942] hover:bg-amber-50 transition min-h-[42px]"
           >
-            <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+            <ArrowLeft className="w-4 h-4 text-orange-600" aria-hidden="true" />
             <span>Voltar ao aplicativo</span>
           </button>
 
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full flex items-center gap-2.5 rounded-2xl border border-rose-500/30 bg-rose-950/50 px-3.5 py-2.5 text-xs font-bold text-rose-200 hover:bg-rose-900/60 transition min-h-[42px]"
+            className="w-full flex items-center gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-bold text-rose-800 hover:bg-rose-100 transition min-h-[42px]"
           >
             <LogOut className="w-4 h-4" aria-hidden="true" />
             <span>Encerrar sessão</span>
@@ -332,24 +458,31 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       </aside>
 
       {/* Mobile Admin Header */}
-      <header className="lg:hidden sticky top-0 z-30 bg-slate-950 text-white px-4 h-[58px] flex items-center justify-between border-b border-slate-800">
+      <header className="lg:hidden sticky top-0 z-30 bg-[#FFFBEB]/95 backdrop-blur-xs text-[#0F2942] px-4 h-[60px] flex items-center justify-between border-b border-amber-200">
         <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => setMobileMenuOpen(true)}
             aria-label="Abrir menu administrativo"
-            className="w-10 h-10 rounded-xl border border-slate-800 bg-slate-900 flex items-center justify-center text-slate-200"
+            className="w-10 h-10 rounded-xl border border-amber-200 bg-white flex items-center justify-center text-[#0F2942]"
           >
             <Menu className="w-5 h-5" aria-hidden="true" />
           </button>
-          <span className="text-sm font-extrabold tracking-tight">Painel Admin</span>
+          <img
+            src={tucaAppIcon}
+            alt="FalaKids"
+            className="w-8 h-8 rounded-xl object-cover border border-amber-200"
+          />
+          <span className="text-sm font-display font-extrabold tracking-tight text-[#0F2942]">
+            FalaKids Admin
+          </span>
         </div>
 
         <button
           type="button"
           onClick={handleLogout}
           aria-label="Sair do painel administrativo"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-bold text-rose-300"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-800"
         >
           <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
           <span>Sair</span>
@@ -366,18 +499,27 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         >
           <div
             onClick={() => setMobileMenuOpen(false)}
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
+            className="fixed inset-0 bg-[#0F2942]/45 backdrop-blur-xs"
             aria-hidden="true"
           />
-          <aside className="relative z-10 w-72 max-w-[85vw] bg-slate-950 text-slate-100 h-full p-5 flex flex-col justify-between">
+          <aside className="relative z-10 w-72 max-w-[85vw] bg-[#FFFBEB] text-[#0F2942] h-full p-5 flex flex-col justify-between border-r border-amber-200">
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <span className="text-base font-extrabold text-white">Menu Admin</span>
+                <div className="flex items-center gap-2.5">
+                  <img
+                    src={tucaAppIcon}
+                    alt="FalaKids"
+                    className="w-9 h-9 rounded-xl object-cover border border-amber-200"
+                  />
+                  <span className="text-base font-display font-extrabold text-[#0F2942]">
+                    FalaKids Admin
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setMobileMenuOpen(false)}
                   aria-label="Fechar menu administrativo"
-                  className="w-9 h-9 rounded-xl border border-slate-800 flex items-center justify-center text-slate-300"
+                  className="w-9 h-9 rounded-xl border border-amber-200 bg-white flex items-center justify-center text-[#0F2942]"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -385,19 +527,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               {renderMenuButtons()}
             </div>
 
-            <div className="space-y-2 pt-4 border-t border-slate-800">
+            <div className="space-y-2 pt-4 border-t border-amber-200">
               <button
                 type="button"
                 onClick={onExitToApp}
-                className="w-full flex items-center gap-2.5 rounded-2xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-xs font-bold text-slate-200 min-h-[42px]"
+                className="w-full flex items-center gap-2.5 rounded-2xl border border-amber-200 bg-white px-3.5 py-2.5 text-xs font-bold text-[#0F2942] min-h-[42px]"
               >
-                <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+                <ArrowLeft className="w-4 h-4 text-orange-600" aria-hidden="true" />
                 <span>Voltar ao aplicativo</span>
               </button>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="w-full flex items-center gap-2.5 rounded-2xl border border-rose-500/30 bg-rose-950/50 px-3.5 py-2.5 text-xs font-bold text-rose-200 min-h-[42px]"
+                className="w-full flex items-center gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-bold text-rose-800 min-h-[42px]"
               >
                 <LogOut className="w-4 h-4" aria-hidden="true" />
                 <span>Encerrar sessão</span>
@@ -412,6 +554,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         {route === 'dashboard' && (
           <AdminDashboardView
             users={users}
+            metrics={metrics}
             appConfig={appConfig}
             logs={logs}
             onNavigate={navigateAdmin}
@@ -428,15 +571,29 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             onRefresh={loadUsersFromServer}
             onCreateUser={handleCreateUser}
             onUpdateUser={handleUpdateUser}
-            onToggleBlockUser={handleToggleBlockUser}
+            onGrantPremium={handleGrantPremium}
+            onRevokePremium={handleRevokePremium}
+            onBlockUser={handleBlockUser}
+            onUnblockUser={handleUnblockUser}
             onDeleteUser={handleDeleteUser}
+            onFetchUserHistory={fetchAdminUserHistory}
           />
         )}
 
         {route === 'asaas' && <AdminAsaasView />}
 
         {route === 'app-settings' && (
-          <AdminAppSettingsView config={appConfig} onSaveConfig={handleSaveAppConfig} />
+          <AdminAppSettingsView
+            config={appConfig}
+            contentCatalog={contentCatalog}
+            loadingCatalog={loadingCatalog}
+            savingCatalogId={savingCatalogId}
+            catalogNotice={catalogNotice}
+            catalogError={catalogError}
+            onSaveConfig={handleSaveAppConfig}
+            onRefreshCatalog={loadCatalogFromServer}
+            onToggleContentTier={handleToggleContentTier}
+          />
         )}
 
         {route === 'security' && (
@@ -445,7 +602,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             logs={logs}
             onSessionUpdated={(updated) => {
               setSession(updated);
-              setLogs(loadAdminAuditLogs());
+              loadUsersFromServer();
             }}
           />
         )}

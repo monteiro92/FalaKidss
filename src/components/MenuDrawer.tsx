@@ -17,11 +17,15 @@ import {
 } from 'lucide-react';
 import { AppTheme } from '../data/themes';
 import { AppSection } from '../types/app';
+import { CatalogItemDTO } from '../types/premium';
+import { ContentTierBadge } from './ContentTierBadge';
+import tucaAppIcon from '../assets/images/tuca_app_icon.png';
 
 interface MenuDrawerProps {
   open: boolean;
   currentSection: AppSection;
   theme: AppTheme;
+  catalogItems?: CatalogItemDTO[];
   onClose: () => void;
   onNavigate: (section: AppSection) => void;
 }
@@ -54,6 +58,7 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
   open,
   currentSection,
   theme,
+  catalogItems,
   onClose,
   onNavigate,
 }) => {
@@ -81,23 +86,33 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
   const renderItem = (item: DrawerNavItem) => {
     const Icon = item.Icon;
     const isActive = currentSection === item.id;
+    const modCatalog = catalogItems?.find(
+      (entry) => entry.category === 'module' && entry.id === item.id
+    );
     return (
       <button
         key={item.id}
         type="button"
         onClick={() => handleSelect(item.id)}
         aria-current={isActive ? 'page' : undefined}
-        className={`w-full flex items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-left text-sm font-semibold transition min-h-[44px] ${
+        className={`w-full flex items-center justify-between gap-2 rounded-2xl border px-3.5 py-2.5 text-left text-sm font-semibold transition min-h-[44px] ${
           isActive
             ? `${theme.selectedCardClass} ${theme.accentTextClass} font-bold`
             : 'border-transparent text-slate-700 hover:bg-slate-100 hover:text-slate-900'
         }`}
       >
-        <Icon
-          className={`w-5 h-5 shrink-0 ${isActive ? theme.iconPrimaryClass : 'text-slate-500'}`}
-          aria-hidden="true"
-        />
-        <span className="truncate">{item.label}</span>
+        <span className="flex items-center gap-3 min-w-0">
+          <Icon
+            className={`w-5 h-5 shrink-0 ${isActive ? theme.iconPrimaryClass : 'text-slate-500'}`}
+            aria-hidden="true"
+          />
+          <span className="truncate">{item.label}</span>
+        </span>
+        {modCatalog && (
+          <span className="shrink-0">
+            <ContentTierBadge tier={modCatalog.tier} unlocked={modCatalog.unlocked} compact />
+          </span>
+        )}
       </button>
     );
   };
@@ -130,10 +145,10 @@ export const MenuDrawer: React.FC<MenuDrawerProps> = ({
               <div className="flex items-center gap-3 min-w-0">
                 <span className="w-10 h-10 rounded-xl overflow-hidden shadow-xs shrink-0 inline-flex items-center justify-center bg-amber-400">
                   <img
-                    src="/assets/aistudio/image_9e4ec357.png"
+                    src={tucaAppIcon}
                     alt=""
                     aria-hidden="true"
-                    className="w-full h-full object-cover object-[50%_49%] scale-[1.36]"
+                    className="w-full h-full object-cover"
                   />
                 </span>
                 <div className="min-w-0">

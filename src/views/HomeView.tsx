@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'motion/react';
 import {
   Play,
   BookOpen,
@@ -8,10 +7,9 @@ import {
   ShieldCheck,
   Star,
   Volume2,
-  ArrowRight,
-  Sparkles,
 } from 'lucide-react';
 import { AppSection, AudioSettings, ChildProfile, ProgressState, ThemeId } from '../types/app';
+import { ContentCatalogResponse } from '../types/premium';
 import { getAgeRecommendations } from '../data/curriculum';
 import { APP_THEMES } from '../data/themes';
 import { ThemePicker } from '../components/ThemePicker';
@@ -22,6 +20,7 @@ interface HomeViewProps {
   profile: ChildProfile;
   progress: ProgressState;
   audioSettings: AudioSettings;
+  catalogCounts?: ContentCatalogResponse['counts'];
   onNavigate: (section: AppSection) => void;
   onSelectTheme: (id: ThemeId) => void;
 }
@@ -31,11 +30,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
   profile,
   progress,
   audioSettings,
+  catalogCounts,
   onNavigate,
   onSelectTheme,
 }) => {
   const recs = getAgeRecommendations(profile.ageGroup);
   const theme = APP_THEMES[themeId];
+  const gameCounts = catalogCounts?.byCategory.game ?? { total: 12, free: 10, premium: 2 };
+  const storyCounts = catalogCounts?.byCategory.story ?? { total: 5, free: 3, premium: 2 };
+  const activityCounts = catalogCounts?.byCategory.activity ?? { total: 4, free: 0, premium: 4 };
 
   const handleNav = (section: AppSection) => {
     playFeedbackTone('click', audioSettings.volume);
@@ -58,9 +61,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </>
         )}
 
-        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          <div className="lg:col-span-7 space-y-5">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 leading-tight">
+        <div className="relative z-10 max-w-3xl space-y-5">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 leading-tight">
               Olá! Vamos aprender brincando?
             </h1>
 
@@ -92,25 +94,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 <span>Ouvir o Tuca</span>
               </button>
             </div>
-          </div>
-
-          <div className="lg:col-span-5 flex flex-col items-center">
-            <motion.div
-              animate={{ y: [0, -6, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-              className="w-full max-w-[300px] aspect-square rounded-3xl overflow-hidden border border-sky-100 bg-sky-50 shadow-sm"
-            >
-              <img
-                src="/src/assets/images/mascot_tuca_hero_1794804099910.jpg"
-                alt="Mascote Tuca, tucano amigável do FalaKids acenando"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
-              />
-            </motion.div>
-            <p className="mt-3 text-sm font-semibold text-slate-600">
-              Cada palavra é uma conquista!
-            </p>
-          </div>
         </div>
       </section>
 
@@ -126,7 +109,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
           <div className="mt-4">
             <h2 className="text-lg font-extrabold text-slate-900">MINHAS ATIVIDADES</h2>
-            <p className="text-sm text-slate-600 mt-1">Palavras, vogais, sons, boca 3D e frases</p>
+            <p className="text-sm text-slate-600 mt-1">
+              Trilhas gratuitas e {activityCounts.premium} exclusivas Premium
+            </p>
           </div>
         </button>
 
@@ -140,7 +125,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
           <div className="mt-4">
             <h2 className="text-lg font-extrabold text-slate-900">JOGOS EDUCATIVOS</h2>
-            <p className="text-sm text-slate-600 mt-1">9 jogos divertidos com estrelinhas</p>
+            <p className="text-sm text-slate-600 mt-1">
+              {gameCounts.premium > 0
+                ? `${gameCounts.free} gratuitos + ${gameCounts.premium} exclusivos Premium`
+                : `${gameCounts.free} jogos divertidos com estrelinhas`}
+            </p>
           </div>
         </button>
 
@@ -154,7 +143,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
           <div className="mt-4">
             <h2 className="text-lg font-extrabold text-slate-900">HISTÓRIAS</h2>
-            <p className="text-sm text-slate-600 mt-1">Contos narrados e texto sincronizado</p>
+            <p className="text-sm text-slate-600 mt-1">
+              {storyCounts.premium > 0
+                ? `${storyCounts.free} gratuitas + ${storyCounts.premium} exclusivas Premium`
+                : `${storyCounts.free} contos narrados e sincronizados`}
+            </p>
           </div>
         </button>
 
@@ -173,9 +166,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </button>
       </section>
 
-      {/* Daily achievement + age-adapted activity suggestions */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-5 rounded-3xl border border-amber-200 bg-white p-6 flex flex-col justify-between gap-4">
+      {/* Daily achievement */}
+      <section>
+        <div className="rounded-3xl border border-amber-200 bg-white p-6 flex flex-col justify-between gap-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-xl font-bold text-slate-900">Conquista de hoje</h2>
@@ -207,36 +200,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
               </div>
               <div className="text-xs font-medium text-slate-600 mt-0.5">Dias ativos</div>
             </div>
-          </div>
-        </div>
-
-        <div className="lg:col-span-7 rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">{recs.title}</h2>
-              <p className="text-sm text-slate-600 mt-0.5">{recs.subtitle}</p>
-            </div>
-            <Sparkles className="w-6 h-6 text-sky-500 shrink-0" aria-hidden="true" />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {recs.suggestedSections.map((item) => (
-              <button
-                key={item.section}
-                type="button"
-                onClick={() => handleNav(item.section)}
-                className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-left hover:border-sky-300 hover:bg-sky-50 transition flex flex-col justify-between min-h-[116px]"
-              >
-                <div>
-                  <div className="text-sm font-bold text-slate-900">{item.label}</div>
-                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">{item.reason}</p>
-                </div>
-                <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-sky-700">
-                  <span>Abrir</span>
-                  <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
-                </div>
-              </button>
-            ))}
           </div>
         </div>
       </section>

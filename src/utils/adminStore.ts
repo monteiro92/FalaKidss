@@ -1,8 +1,12 @@
 import {
+  AdminAccountType,
   AdminAppConfig,
   AdminAuditLog,
+  AdminDashboardMetrics,
+  AdminPremiumDuration,
   AdminRoute,
   AdminSession,
+  AdminUserHistoryResponse,
   AsaasConfigPublic,
   AsaasLivePayment,
   AsaasOrderRecord,
@@ -10,7 +14,7 @@ import {
   ManagedUserAccount,
   VocalTractAccessResponse,
 } from '../types/admin';
-import { loadPersistedState } from './storage';
+import { CatalogItemDTO, ContentCatalogResponse, ContentTier } from '../types/premium';
 
 const ADMIN_SESSION_KEY = 'fala_melhor_admin_session_v1';
 const ADMIN_USERS_KEY = 'fala_melhor_admin_users_v1';
@@ -65,7 +69,7 @@ async function parseJsonSafely<T>(res: Response): Promise<T> {
   }
 }
 
-async function fetchJsonWithRetry<T>(
+export async function fetchJsonWithRetry<T>(
   url: string,
   init?: RequestInit,
   retries = 3
@@ -103,6 +107,28 @@ async function fetchJsonWithRetry<T>(
     }
   }
   throw lastErr || new Error('Não foi possível conectar ao servidor.');
+}
+
+export function getStoredSubscriberToken(): string {
+  try {
+    return localStorage.getItem(SUBSCRIBER_TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function storeSubscriberToken(token?: string): void {
+  if (!token) return;
+  try {
+    localStorage.setItem(SUBSCRIBER_TOKEN_KEY, token);
+  } catch {
+    // Ignore storage warnings
+  }
+}
+
+export function getSubscriberHeaders(): Record<string, string> {
+  const token = getStoredSubscriberToken();
+  return token ? { 'x-subscriber-id': token } : {};
 }
 
 export async function authenticateAdmin(
@@ -350,28 +376,63 @@ export function refreshAdminAsaasPayment(paymentId: string): Promise<{
   return adminApiFetch(`/api/admin/asaas/payments/${encodeURIComponent(paymentId)}/refresh`);
 }
 
-// --- Protected Admin User Management (Server-Backed) ---
-export async function fetchAdminUsers(): Promise<ManagedUserAccount[]> {
-  const data = await adminApiFetch<{ users: ManagedUserAccount[] }>('/api/admin/users');
+// --- Protected Admin User & Premium Management (Server-Backed) ---
+export interface AdminUsersSyncPayload {
+  users: ManagedUserAccount[];
+  metrics: AdminDashboardMetrics;
+  auditLogs: AdminAuditLog[];
+}
+
+export interface AdminUserMutationResponse {
+  user: ManagedUserAccount;
+  metrics: AdminDashboardMetrics;
+  auditLogs: AdminAuditLog[];
+}
+
+export function fetchAdminDashboard(): Promise<{
+  metrics: AdminDashboardMetrics;
+  auditLogs: AdminAuditLog[];
+}> {
+  return adminApiFetch('/api/admin/dashboard');
+}
+
+export function fetchAdminAuditLogs(): Promise<{ auditLogs: AdminAuditLog[] }> {
+  return adminApiFetch('/api/admin/audit-logs');
+}
+
+export async function fetchAdminUsers(): Promise<AdminUsersSyncPayload> {
+  const data = await adminApiFetch<AdminUsersSyncPayload>('/api/admin/users');
   const users = Array.isArray(data.users) ? data.users : [];
   saveManagedUsers(users);
-  return users;
+  return {
+    users,
+    metrics: data.metrics,
+    auditLogs: Array.isArray(data.auditLogs) ? data.auditLogs : [],
+  };
 }
 
 export async function createAdminUser(payload: {
   guardianName: string;
   email: string;
+  accountType: AdminAccountType;
   childName: string;
   childAge: number;
   status: 'active' | 'blocked';
+  plan: 'free' | 'premium';
+  passwordMode: 'provisional' | 'invite';
   password?: string;
   notes?: string;
-}): Promise<ManagedUserAccount> {
-  const data = await adminApiFetch<{ user: ManagedUserAccount }>('/api/admin/users', {
+  premiumGrant?: {
+    duration: AdminPremiumDuration;
+    startDate?: string;
+    expiresAt?: string | null;
+    reason?: string;
+  };
+}): Promise<AdminUserMutationResponse> {
+  return adminApiFetch<AdminUserMutationResponse>('/api/admin/users', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
-  return data.user;
 }
 
 export async function updateAdminUser(
@@ -379,50 +440,109 @@ export async function updateAdminUser(
   payload: Partial<{
     guardianName: string;
     email: string;
+    accountType: AdminAccountType;
     childName: string;
     childAge: number;
     status: 'active' | 'blocked';
+    plan: 'free' | 'premium';
+    passwordMode: 'keep' | 'provisional' | 'invite';
     password: string;
     notes: string;
   }>
-): Promise<ManagedUserAccount> {
-  const data = await adminApiFetch<{ user: ManagedUserAccount }>(
+): Promise<AdminUserMutationResponse> {
+  return adminApiFetch<AdminUserMutationResponse>(
     `/api/admin/users/${encodeURIComponent(id)}`,
     {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }
   );
-  return data.user;
 }
 
-export async function deleteAdminUser(id: string): Promise<void> {
-  await adminApiFetch<{ deleted: boolean }>(`/api/admin/users/${encodeURIComponent(id)}`, {
+export async function grantAdminUserPremium(
+  id: string,
+  payload: {
+    duration: AdminPremiumDuration;
+    startDate?: string;
+    expiresAt?: string | null;
+    reason?: string;
+  }
+): Promise<AdminUserMutationResponse> {
+  return adminApiFetch<AdminUserMutationResponse>(
+    `/api/admin/users/${encodeURIComponent(id)}/grant-premium`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function revokeAdminUserPremium(
+  id: string,
+  reason?: string
+): Promise<AdminUserMutationResponse> {
+  return adminApiFetch<AdminUserMutationResponse>(
+    `/api/admin/users/${encodeURIComponent(id)}/revoke-premium`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }
+  );
+}
+
+export async function blockAdminUser(id: string): Promise<AdminUserMutationResponse> {
+  return adminApiFetch<AdminUserMutationResponse>(
+    `/api/admin/users/${encodeURIComponent(id)}/block`,
+    { method: 'POST' }
+  );
+}
+
+export async function unblockAdminUser(id: string): Promise<AdminUserMutationResponse> {
+  return adminApiFetch<AdminUserMutationResponse>(
+    `/api/admin/users/${encodeURIComponent(id)}/unblock`,
+    { method: 'POST' }
+  );
+}
+
+export async function fetchAdminUserHistory(id: string): Promise<AdminUserHistoryResponse> {
+  return adminApiFetch<AdminUserHistoryResponse>(
+    `/api/admin/users/${encodeURIComponent(id)}/history`
+  );
+}
+
+export async function deleteAdminUser(id: string): Promise<{
+  deleted: boolean;
+  id: string;
+  metrics: AdminDashboardMetrics;
+  auditLogs: AdminAuditLog[];
+}> {
+  return adminApiFetch(`/api/admin/users/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
 }
 
-// --- Server-Authoritative Subscriber Token & Validation Helpers ---
-function getStoredSubscriberToken(): string {
-  try {
-    return localStorage.getItem(SUBSCRIBER_TOKEN_KEY) || '';
-  } catch {
-    return '';
-  }
+export interface AdminContentCatalogResponse {
+  monthlyValue: number;
+  counts: ContentCatalogResponse['counts'];
+  items: CatalogItemDTO[];
+  auditLogs: AdminAuditLog[];
 }
 
-function storeSubscriberToken(token?: string): void {
-  if (!token) return;
-  try {
-    localStorage.setItem(SUBSCRIBER_TOKEN_KEY, token);
-  } catch {
-    // Ignore storage warnings
-  }
+export function fetchAdminContentCatalog(): Promise<AdminContentCatalogResponse> {
+  return adminApiFetch<AdminContentCatalogResponse>('/api/admin/content-catalog');
 }
 
-function getSubscriberHeaders(): Record<string, string> {
-  const token = getStoredSubscriberToken();
-  return token ? { 'x-subscriber-id': token } : {};
+export function updateAdminContentTier(
+  id: string,
+  tier: ContentTier
+): Promise<AdminContentCatalogResponse> {
+  return adminApiFetch<AdminContentCatalogResponse>(
+    `/api/admin/content-catalog/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ tier }),
+    }
+  );
 }
 
 export async function syncCurrentUserWithServer(payload: {
@@ -493,30 +613,9 @@ export function loadManagedUsers(): ManagedUserAccount[] {
       if (Array.isArray(parsed)) return parsed;
     }
   } catch {
-    // Seed initial directory synced with local child profile
+    // Ignore storage read errors
   }
-
-  const localApp = loadPersistedState();
-  const now = new Date();
-
-  const initial: ManagedUserAccount[] = [
-    {
-      id: 'usr-local-primary',
-      guardianName: 'Responsável Principal (Dispositivo)',
-      email: 'familia@dispositivo.local',
-      childName: localApp.profile.name,
-      childAge: localApp.profile.age,
-      status: 'active',
-      starsCount: localApp.progress.starsTotal,
-      activitiesCount: localApp.progress.activitiesCompleted,
-      createdAt: now.toISOString(),
-      lastAccessAt: now.toISOString(),
-      notes: 'Perfil ativo sincronizado neste aparelho.',
-    },
-  ];
-
-  saveManagedUsers(initial);
-  return initial;
+  return [];
 }
 
 export function saveManagedUsers(users: ManagedUserAccount[]): void {
